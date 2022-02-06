@@ -1,0 +1,19 @@
+{
+  "name": "vite-plugin-vue2-jsx",
+  "version": "1.0.0",
+  "description": "Vite plugin for Vue2",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsc -w -p . --incremental --skipLibCheck",
+    "test": "jest --clearCache && jest --runInBand --forceExit",
+    "build": "rm -rf dist && tsc -p . --skipLibCheck"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "vite",
+    "vue2"
+  ],
+  "license": "MIT"
+}
