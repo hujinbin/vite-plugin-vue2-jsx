@@ -62,7 +62,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
   }
 
   const filter = createFilter(options.include || /\.vue$/, options.exclude)
-
   return {
     name: 'vite-plugin-vue2',
 
@@ -142,8 +141,9 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     async transform(code, id, transformOptions) {
       const { filename, query } = parseVueRequest(id)
 
-      if (/\.(tsx|jsx)$/.test(id)) {
-        return transformVueJsx(code, id, options.jsxOptions)
+      const langId = id+'.jsx'
+      if (/\.(tsx|jsx)$/.test(langId)) {
+        return transformVueJsx(code, langId, options.jsxOptions)
       }
 
       if ((!query.vue && !filter(filename)) || query.raw) {

@@ -15,5 +15,5 @@
     "lib": ["esnext", "dom"],
     "sourceMap": true
   },
-  "include": ["./src", "./index.ts"]
+  "include": ["./src", "index.d.ts"]
 }
