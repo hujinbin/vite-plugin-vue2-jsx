@@ -138,12 +138,22 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       }
     },
 
-    async transform(code, id, transformOptions) {
+    async transform(fileCode, id, transformOptions) {
+      let code = fileCode;
       const { filename, query } = parseVueRequest(id)
-
-      const langId = id+'.jsx'
-      if (/\.(tsx|jsx)$/.test(langId)) {
-        return transformVueJsx(code, langId, options.jsxOptions)
+      if (/\.(vue)$/.test(id)) {
+        let hasJsx = false;
+        fileCode.replace(/<script.*?>([\s\S]+?)<\/script>/img,(_,js)=>{    //正则匹配出script中的内容
+          // 判断script内是否包含jsx语法和是否已加lang="jsx"
+          if(/<[^>]+>/.test(js) && /<script\s*lang=("|')jsx("|').*?>/.test(_)){
+            hasJsx = true;
+          }
+          return js
+        });
+        if(hasJsx) code = fileCode.replace('<script','<script lang="jsx"');
+      }
+      if (/\.(tsx|jsx)$/.test(id)) {
+        return transformVueJsx(code, id, options.jsxOptions)
       }
 
       if ((!query.vue && !filter(filename)) || query.raw) {
