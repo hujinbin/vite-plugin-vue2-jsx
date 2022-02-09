@@ -156,6 +156,11 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
         return transformVueJsx(code, id, options.jsxOptions)
       }
 
+      // js文件包含jsx语法自动转换
+      if (!query.vue && /\.(js)$/.test(id) && /<[^>]+>/.test(code)) {
+        return transformVueJsx(code, id, options.jsxOptions)
+      }
+
       if ((!query.vue && !filter(filename)) || query.raw) {
         return
       }
