@@ -60,7 +60,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     ...rawOptions,
     root: process.cwd(),
   }
-
   const filter = createFilter(options.include || /\.vue$/, options.exclude)
   return {
     name: 'vite-plugin-vue2',
@@ -110,7 +109,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       if (id === vueHotReload) {
         return vueHotReloadCode
       }
-
+  
       const { filename, query } = parseVueRequest(id)
       // select corresponding block for subpart virtual modules
       if (query.vue) {
@@ -145,12 +144,16 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
         let hasJsx = false;
         fileCode.replace(/<script.*?>([\s\S]+?)<\/script>/img,(_,js)=>{    //正则匹配出script中的内容
           // 判断script内是否包含jsx语法和是否已加lang="jsx"
-          if(/<[^>]+>/.test(js) && /<script\s*lang=("|')jsx("|').*?>/.test(_)){
+          if(/<[^>]+>/.test(js) &&
+            /<script.*?>/.test(_) &&
+            !(/<script\s*lang=("|')jsx("|').*?>/.test(_))){
             hasJsx = true;
           }
           return js
         });
-        if(hasJsx) code = fileCode.replace('<script','<script lang="jsx"');
+        if(hasJsx){
+          code = fileCode.replace('<script','<script lang="jsx"');
+        }
       }
       if (/\.(tsx|jsx)$/.test(id)) {
         return transformVueJsx(code, id, options.jsxOptions)
