@@ -62,7 +62,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
   }
   const filter = createFilter(options.include || /\.vue$/, options.exclude)
   return {
-    name: 'vite-plugin-vue2',
+    name: 'vite-plugin-vue2-jsx',
 
     config(config) {
       if (options.jsx) {
@@ -88,9 +88,22 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     },
 
     configureServer(server) {
+      // server.listen = (async (port: number, ...args: any[]) => {
+      //   try {
+      //     ...
+      //     // 依赖预编译
+      //     await runOptimize()
+      //   } 
+      //   ...
+      // }) as any
+      // console.log(11111111)
+      // server.transformWithEsbuild.use((code,id) => {
+      //   console.log(code,id)
+      //   // 自定义请求处理...
+      // })
       options.devServer = server
     },
-
+    // 处理 ES6 的 import 语句，最后需要返回一个模块的 id
     async resolveId(id) {
       if (id === vueComponentNormalizer || id === vueHotReload) {
         return id
@@ -101,6 +114,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       }
     },
 
+    // 执行每个 rollup plugin 的 load 方法，产出 ast 数据等
     load(id) {
       if (id === vueComponentNormalizer) {
         return normalizeComponentCode
@@ -138,6 +152,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     },
 
     async transform(fileCode, id, transformOptions) {
+      console.log(fileCode, id)
       let code = fileCode;
       const { filename, query } = parseVueRequest(id)
       if (/\.(vue)$/.test(id)) {
