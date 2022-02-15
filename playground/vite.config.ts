@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
-const { createVuePlugin } = require('../dist')
+import langJsx from 'vite-plugin-lang-jsx'
+import { createVuePlugin } from '../src'
 
 const config = defineConfig({
   resolve: {
@@ -12,7 +13,8 @@ const config = defineConfig({
     minify: false,
   },
   plugins: [
-    createVuePlugin({ jsx: true }),
+    langJsx(),
+    createVuePlugin({ jsx: true }) as any,
   ],
 })
 
