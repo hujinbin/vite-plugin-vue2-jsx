@@ -13,6 +13,9 @@ import { SFCBlock } from '@vue/component-compiler-utils'
 import { handleHotUpdate } from './hmr'
 import { transformVueJsx } from './jsxTransform'
 
+import acorn from 'acorn';
+import jsx from 'acorn-jsx';
+
 export const vueComponentNormalizer = '\0/vite/vueComponentNormalizer'
 export const vueHotReload = '\0/vite/vueHotReload'
 
@@ -54,6 +57,48 @@ export interface ResolvedOptions extends VueViteOptions {
   target?: string | string[]
 }
 
+// https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L147
+const scriptRE = /(<script\b(?:\s[^>]*>|>))(.*?)<\/script>/gims
+// https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L151
+const langRE = /\blang\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s'">]+))/im
+
+class AstExt {
+  constructor() {
+    this.acornExt = acorn.Parser.extend(jsx());
+  }
+
+  deepWalk(ast:any, cb:any) {
+    if (!ast) return;
+    if (typeof ast === 'object') {
+      for (const key of Object.keys(ast)) {
+        const bool = cb({ [key]: ast[key] });
+        if (bool === false) return;
+        this.deepWalk(ast[key], cb);
+      }
+    }
+    if (Array.isArray(ast)) {
+      for (const item of ast) {
+        const bool = cb(item);
+        if (bool === false) return;
+        this.deepWalk(item, cb);
+      }
+    }
+  }
+
+  async checkJSX(content:any) {
+    return new Promise(resolve => {
+      const ast = this.acornExt.parse(content, { sourceType: 'module', ecmaVersion: 2019 });
+      this.deepWalk(ast, node => {
+        if (['JSXElement', 'JSXFragment'].includes(node.type)) {
+          resolve(true);
+          return false;
+        }
+      });
+      resolve(false);
+    });
+  }
+}
+
 export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
   const options: ResolvedOptions = {
     isProduction: process.env.NODE_ENV === 'production',
@@ -61,10 +106,45 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     root: process.cwd(),
   }
   const filter = createFilter(options.include || /\.vue$/, options.exclude)
+  const name = 'vite-plugin-vue2-jsx'
+  const astExt = new AstExt;
   return {
-    name: 'vite-plugin-vue2-jsx',
-
+    name,
+    enforce: 'pre',
     config(config) {
+      if (!config.optimizeDeps) config.optimizeDeps = {};
+      if (!config.optimizeDeps.esbuildOptions) config.optimizeDeps.esbuildOptions = {};
+      if (!config.optimizeDeps.esbuildOptions.plugins) config.optimizeDeps.esbuildOptions.plugins = [];
+      config.optimizeDeps.esbuildOptions.plugins.push({
+        name,
+        async setup(build) {
+          console.log(build)
+          build.onLoad({ filter: /\.vue$/ }, async args => {
+            const raw = fs.readFileSync(args.path, 'utf8');
+            let js = '';
+            let loader = 'js';
+            let match = null;
+            scriptRE.lastIndex = 0;
+            // https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L240
+            while (match = scriptRE.exec(raw)) {
+              const [, openTag, content] = match;
+              const langMatch = openTag.match(langRE);
+              const lang = langMatch && (langMatch[1] || langMatch[2] || langMatch[3]);
+              if (['ts', 'tsx', 'jsx'].includes(lang)) {
+                loader = lang;
+              } else if (await astExt.checkJSX(content)) {
+                loader = options.lang;
+              }
+              js = content;
+            }
+
+            return {
+              loader,
+              contents: js,
+            };
+          });
+        },
+      });
       if (options.jsx) {
         return {
           esbuild: {
@@ -88,19 +168,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     },
 
     configureServer(server) {
-      // server.listen = (async (port: number, ...args: any[]) => {
-      //   try {
-      //     ...
-      //     // 依赖预编译
-      //     await runOptimize()
-      //   } 
-      //   ...
-      // }) as any
-      // console.log(11111111)
-      // server.transformWithEsbuild.use((code,id) => {
-      //   console.log(code,id)
-      //   // 自定义请求处理...
-      // })
       options.devServer = server
     },
     // 处理 ES6 的 import 语句，最后需要返回一个模块的 id
