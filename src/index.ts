@@ -63,8 +63,8 @@ const scriptRE = /(<script\b(?:\s[^>]*>|>))(.*?)<\/script>/gims
 const langRE = /\blang\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s'">]+))/im
 
 class AstExt {
+  public acornExt = acorn.Parser.extend(jsx())
   constructor() {
-    this.acornExt = acorn.Parser.extend(jsx());
   }
 
   deepWalk(ast:any, cb:any) {
@@ -88,7 +88,7 @@ class AstExt {
   async checkJSX(content:any) {
     return new Promise(resolve => {
       const ast = this.acornExt.parse(content, { sourceType: 'module', ecmaVersion: 2019 });
-      this.deepWalk(ast, node => {
+      this.deepWalk(ast, (node: any) => {
         if (['JSXElement', 'JSXFragment'].includes(node.type)) {
           resolve(true);
           return false;
@@ -119,8 +119,9 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
         name,
         async setup(build) {
           console.log(build)
-          build.onLoad({ filter: /\.vue$/ }, async args => {
-            const raw = fs.readFileSync(args.path, 'utf8');
+          build.onLoad({ filter: /\.vue$/ }, 
+            async ({ path }) : Promise<any> => {
+            const raw = fs.readFileSync(path, 'utf8');
             let js = '';
             let loader = 'js';
             let match = null;
@@ -130,10 +131,10 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
               const [, openTag, content] = match;
               const langMatch = openTag.match(langRE);
               const lang = langMatch && (langMatch[1] || langMatch[2] || langMatch[3]);
-              if (['ts', 'tsx', 'jsx'].includes(lang)) {
-                loader = lang;
+              if (lang === 'ts' || lang === 'tsx' || lang === 'jsx') {
+                loader = lang
               } else if (await astExt.checkJSX(content)) {
-                loader = options.lang;
+                loader = 'jsx';
               }
               js = content;
             }

@@ -2,16 +2,16 @@
     <div :columns="columns">
         {{columns}}
     </div>
-    <SaDialogCommon></SaDialogCommon>
+    <!-- <SaDialogCommon></SaDialogCommon> -->
 </template>
 
 <script>
-import SaDialogCommon from './components/dialog'
+// import SaDialogCommon from './components/dialog'
 
 export default {
-    components:{
-        SaDialogCommon
-    },
+    // components:{
+    //     SaDialogCommon
+    // },
     data() {
         return {
         };
