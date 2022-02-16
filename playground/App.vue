@@ -2,10 +2,16 @@
     <div :columns="columns">
         {{columns}}
     </div>
+    <SaDialogCommon></SaDialogCommon>
 </template>
 
 <script>
+import SaDialogCommon from './components/dialog'
+
 export default {
+    components:{
+        SaDialogCommon
+    },
     data() {
         return {
         };
