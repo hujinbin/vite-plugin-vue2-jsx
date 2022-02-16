@@ -110,7 +110,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
   const astExt = new AstExt;
   return {
     name,
-    enforce: 'pre',
     config(config) {
       if (!config.optimizeDeps) config.optimizeDeps = {};
       if (!config.optimizeDeps.esbuildOptions) config.optimizeDeps.esbuildOptions = {};
@@ -118,7 +117,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       config.optimizeDeps.esbuildOptions.plugins.push({
         name,
         async setup(build) {
-          console.log(build)
           build.onLoad({ filter: /\.vue$/ }, 
             async ({ path }) : Promise<any> => {
             const raw = fs.readFileSync(path, 'utf8');
@@ -143,6 +141,16 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
               loader,
               contents: js,
             };
+          });
+          build.onLoad({ filter: /\.js$/ }, 
+            async ({ path }) : Promise<any> => {
+            const raw = fs.readFileSync(path, 'utf8');
+            if(/<[^>]+>/.test(raw)){
+              return {
+                loader:'jsx',
+                contents: raw,
+              };
+            }
           });
         },
       });
