@@ -13,8 +13,8 @@ import { SFCBlock } from '@vue/component-compiler-utils'
 import { handleHotUpdate } from './hmr'
 import { transformVueJsx } from './jsxTransform'
 
-import acorn from 'acorn';
-import jsx from 'acorn-jsx';
+// import acorn from 'acorn';
+// import jsx from 'acorn-jsx';
 
 export const vueComponentNormalizer = '\0/vite/vueComponentNormalizer'
 export const vueHotReload = '\0/vite/vueHotReload'
@@ -62,41 +62,62 @@ const scriptRE = /(<script\b(?:\s[^>]*>|>))(.*?)<\/script>/gims
 // https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L151
 const langRE = /\blang\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s'">]+))/im
 
-class AstExt {
-  public acornExt = acorn.Parser.extend(jsx())
-  constructor() {
-  }
+// class AstExt {
+//   public acornExt = acorn.Parser.extend(jsx())
+//   constructor() {
+//   }
 
-  deepWalk(ast:any, cb:any) {
-    if (!ast) return;
-    if (typeof ast === 'object') {
-      for (const key of Object.keys(ast)) {
-        const bool = cb({ [key]: ast[key] });
-        if (bool === false) return;
-        this.deepWalk(ast[key], cb);
-      }
-    }
-    if (Array.isArray(ast)) {
-      for (const item of ast) {
-        const bool = cb(item);
-        if (bool === false) return;
-        this.deepWalk(item, cb);
-      }
-    }
-  }
+//   deepWalk(ast:any, cb:any) {
+//     if (!ast) return;
+//     if (typeof ast === 'object') {
+//       for (const key of Object.keys(ast)) {
+//         const bool = cb({ [key]: ast[key] });
+//         if (bool === false) return;
+//         this.deepWalk(ast[key], cb);
+//       }
+//     }
+//     if (Array.isArray(ast)) {
+//       for (const item of ast) {
+//         const bool = cb(item);
+//         if (bool === false) return;
+//         this.deepWalk(item, cb);
+//       }
+//     }
+//   }
 
-  async checkJSX(content:any) {
-    return new Promise(resolve => {
-      const ast = this.acornExt.parse(content, { sourceType: 'module', ecmaVersion: 2019 });
-      this.deepWalk(ast, (node: any) => {
-        if (['JSXElement', 'JSXFragment'].includes(node.type)) {
-          resolve(true);
-          return false;
+//   async checkJSX(content:any) {
+//     return new Promise(resolve => {
+//       const ast = this.acornExt.parse(content, { sourceType: 'module', ecmaVersion: 2019 });
+//       this.deepWalk(ast, (node: any) => {
+//         if (['JSXElement', 'JSXFragment'].includes(node.type)) {
+//           resolve(true);
+//           return false;
+//         }
+//       });
+//       resolve(false);
+//     });
+//   }
+// }
+
+const checkJSX = async (content: any) => {
+  return new Promise(resolve => {
+    if (content.indexOf('<script') > -1 && content.indexOf('</script>') > -1) {
+      let hasJsx = false;
+      content.replace(/<script.*?>([\s\S]+?)<\/script>/img, (_:any, js:any) => {    //正则匹配出script中的内容
+        // 判断script内是否包含jsx语法
+        if (/<[^>]+>/.test(js)) {
+          hasJsx = true;
         }
+        return js
       });
-      resolve(false);
-    });
-  }
+      resolve(hasJsx);
+      return false;
+    } else if (/<[^>]+>/.test(content)) {
+      resolve(true);
+      return false;
+    }
+    resolve(false);
+  });
 }
 
 export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
@@ -107,7 +128,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
   }
   const filter = createFilter(options.include || /\.vue$/, options.exclude)
   const name = 'vite-plugin-vue2-jsx'
-  const astExt = new AstExt;
+  // const astExt = new AstExt;
   return {
     name,
     config(config) {
@@ -117,41 +138,41 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       config.optimizeDeps.esbuildOptions.plugins.push({
         name,
         async setup(build) {
-          build.onLoad({ filter: /\.vue$/ }, 
-            async ({ path }) : Promise<any> => {
-            const raw = fs.readFileSync(path, 'utf8');
-            let js = '';
-            let loader = 'js';
-            let match = null;
-            scriptRE.lastIndex = 0;
-            // https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L240
-            while (match = scriptRE.exec(raw)) {
-              const [, openTag, content] = match;
-              const langMatch = openTag.match(langRE);
-              const lang = langMatch && (langMatch[1] || langMatch[2] || langMatch[3]);
-              if (lang === 'ts' || lang === 'tsx' || lang === 'jsx') {
-                loader = lang
-              } else if (await astExt.checkJSX(content)) {
-                loader = 'jsx';
+          build.onLoad({ filter: /\.vue$/ },
+            async ({ path }): Promise<any> => {
+              const raw = fs.readFileSync(path, 'utf8');
+              let js = '';
+              let loader = 'js';
+              let match = null;
+              scriptRE.lastIndex = 0;
+              // https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L240
+              while (match = scriptRE.exec(raw)) {
+                const [, openTag, content] = match;
+                const langMatch = openTag.match(langRE);
+                const lang = langMatch && (langMatch[1] || langMatch[2] || langMatch[3]);
+                if (lang === 'ts' || lang === 'tsx' || lang === 'jsx') {
+                  loader = lang
+                }else if (await checkJSX(content)) {
+                  loader = 'jsx';
+                }
+                js = content;
               }
-              js = content;
-            }
 
-            return {
-              loader,
-              contents: js,
-            };
-          });
-          build.onLoad({ filter: /\.js$/ }, 
-            async ({ path }) : Promise<any> => {
-            const raw = fs.readFileSync(path, 'utf8');
-            if(/<[^>]+>/.test(raw)){
               return {
-                loader:'jsx',
-                contents: raw,
+                loader,
+                contents: js,
               };
-            }
-          });
+            });
+          build.onLoad({ filter: /\.js$/ },
+            async ({ path }): Promise<any> => {
+              const raw = fs.readFileSync(path, 'utf8');
+              if (/<[^>]+>/.test(raw)) {
+                return {
+                  loader: 'jsx',
+                  contents: raw,
+                };
+              }
+            });
         },
       });
       if (options.jsx) {
@@ -199,7 +220,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       if (id === vueHotReload) {
         return vueHotReloadCode
       }
-  
+
       const { filename, query } = parseVueRequest(id)
       // select corresponding block for subpart virtual modules
       if (query.vue) {
@@ -228,22 +249,21 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     },
 
     async transform(fileCode, id, transformOptions) {
-      console.log(fileCode, id)
       let code = fileCode;
       const { filename, query } = parseVueRequest(id)
       if (/\.(vue)$/.test(id)) {
         let hasJsx = false;
-        fileCode.replace(/<script.*?>([\s\S]+?)<\/script>/img,(_,js)=>{    //正则匹配出script中的内容
+        fileCode.replace(/<script.*?>([\s\S]+?)<\/script>/img, (_, js) => {    //正则匹配出script中的内容
           // 判断script内是否包含jsx语法和是否已加lang="jsx"
-          if(/<[^>]+>/.test(js) &&
+          if (/<[^>]+>/.test(js) &&
             /<script.*?>/.test(_) &&
-            !(/<script\s*lang=("|')jsx("|').*?>/.test(_))){
+            !(/<script\s*lang=("|')jsx("|').*?>/.test(_))) {
             hasJsx = true;
           }
           return js
         });
-        if(hasJsx){
-          code = fileCode.replace('<script','<script lang="jsx"');
+        if (hasJsx) {
+          code = fileCode.replace('<script', '<script lang="jsx"');
         }
       }
       if (/\.(tsx|jsx)$/.test(id)) {
