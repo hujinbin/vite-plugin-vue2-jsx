@@ -6,7 +6,7 @@ Vite plugin for Vue2
 ## Install
 
 ```bash
-npm install vite-plugin-vue2 -D
+npm install vite-plugin-vue2-jsx -D
 ```
 
 ```js

@@ -1,20 +1,16 @@
-import { TemplateCompileOptions } from '@vue/component-compiler-utils'
+import fs from 'fs'
+import type { SFCBlock, TemplateCompileOptions } from '@vue/component-compiler-utils'
+import { createFilter } from '@rollup/pluginutils'
+import type { Plugin, ViteDevServer } from 'vite'
 import { normalizeComponentCode } from './utils/componentNormalizer'
 import { vueHotReloadCode } from './utils/vueHotReload'
-import fs from 'fs'
 import { parseVueRequest } from './utils/query'
-import { createFilter } from '@rollup/pluginutils'
 import { transformMain } from './main'
 import { compileSFCTemplate } from './template'
 import { getDescriptor } from './utils/descriptorCache'
 import { transformStyle } from './style'
-import { ViteDevServer, Plugin } from 'vite'
-import { SFCBlock } from '@vue/component-compiler-utils'
 import { handleHotUpdate } from './hmr'
 import { transformVueJsx } from './jsxTransform'
-
-// import acorn from 'acorn';
-// import jsx from 'acorn-jsx';
 
 export const vueComponentNormalizer = '\0/vite/vueComponentNormalizer'
 export const vueHotReload = '\0/vite/vueHotReload'
@@ -62,43 +58,6 @@ const scriptRE = /(<script\b(?:\s[^>]*>|>))(.*?)<\/script>/gims
 // https://github.com/vitejs/vite/blob/e8c840abd2767445a5e49bab6540a66b941d7239/packages/vite/src/node/optimizer/scan.ts#L151
 const langRE = /\blang\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s'">]+))/im
 
-// class AstExt {
-//   public acornExt = acorn.Parser.extend(jsx())
-//   constructor() {
-//   }
-
-//   deepWalk(ast:any, cb:any) {
-//     if (!ast) return;
-//     if (typeof ast === 'object') {
-//       for (const key of Object.keys(ast)) {
-//         const bool = cb({ [key]: ast[key] });
-//         if (bool === false) return;
-//         this.deepWalk(ast[key], cb);
-//       }
-//     }
-//     if (Array.isArray(ast)) {
-//       for (const item of ast) {
-//         const bool = cb(item);
-//         if (bool === false) return;
-//         this.deepWalk(item, cb);
-//       }
-//     }
-//   }
-
-//   async checkJSX(content:any) {
-//     return new Promise(resolve => {
-//       const ast = this.acornExt.parse(content, { sourceType: 'module', ecmaVersion: 2019 });
-//       this.deepWalk(ast, (node: any) => {
-//         if (['JSXElement', 'JSXFragment'].includes(node.type)) {
-//           resolve(true);
-//           return false;
-//         }
-//       });
-//       resolve(false);
-//     });
-//   }
-// }
-
 const checkJSX = async (content: any) => {
   return new Promise(resolve => {
     if (content.indexOf('<script') > -1 && content.indexOf('</script>') > -1) {
@@ -128,7 +87,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
   }
   const filter = createFilter(options.include || /\.vue$/, options.exclude)
   const name = 'vite-plugin-vue2-jsx'
-  // const astExt = new AstExt;
+
   return {
     name,
     config(config) {
@@ -175,6 +134,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
             });
         },
       });
+
       if (options.jsx) {
         return {
           esbuild: {
@@ -186,9 +146,9 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
     },
 
     handleHotUpdate(ctx) {
-      if (!filter(ctx.file)) {
+      if (!filter(ctx.file))
         return
-      }
+
       return handleHotUpdate(ctx, options)
     },
 
@@ -211,7 +171,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       }
     },
 
-    // 执行每个 rollup plugin 的 load 方法，产出 ast 数据等
     load(id) {
       if (id === vueComponentNormalizer) {
         return normalizeComponentCode
@@ -269,7 +228,6 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
       if (/\.(tsx|jsx)$/.test(id)) {
         return transformVueJsx(code, id, options.jsxOptions)
       }
-
       // js文件包含jsx语法自动转换
       if (!query.vue && /\.(js)$/.test(id) && /<[^>]+>/.test(code)) {
         return transformVueJsx(code, id, options.jsxOptions)
@@ -281,11 +239,11 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
 
       if (!query.vue) {
         // main request
-        return await transformMain(code, filename, options, this)
+        return await transformMain(code, filename, options, this as any)
       }
 
       const descriptor = getDescriptor(
-        query.from ? decodeURIComponent(query.from) : filename
+        query.from ? decodeURIComponent(query.from) : filename,
       )!
       // sub block request
       if (query.type === 'template') {
@@ -294,7 +252,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
           descriptor.template!,
           filename,
           options,
-          this
+          this as any,
         )
       }
       if (query.type === 'style') {
@@ -303,7 +261,7 @@ export function createVuePlugin(rawOptions: VueViteOptions = {}): Plugin {
           filename,
           descriptor,
           Number(query.index),
-          this
+          this as any,
         )
       }
     },
